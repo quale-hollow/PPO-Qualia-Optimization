@@ -1,0 +1,19 @@
+# Mujoco Environment
+gymnasium==0.29.1
+numpy==2.2.2
+python==3.12
+
+# Pong Environment
+numpy<2.0  # We use version 1.26.0
+python==3.11
+gymnasium==1.0.0
+envpool
+
+# Cartpole Environment
+gymnasium==1.0.0
+numpy==2.2.2
+python==3.12
+
+# Additional dependencies for plotting
+matplotlib
+texlive
