@@ -1,5 +1,5 @@
 # PPO-Qualia-Optimization
-This repository contains the code and results for the paper **"Qualia Optimization in Reinforcement Learning: Balancing Agent Experience and Performance"**. It provides implementations of the Proximal Policy Optimization (PPO) algorithm for qualia optimization in three reinforcement learning (RL) tasks: **CartPole**, **HalfCheetah**, and **Pong**.
+This repository contains the code and results for experiments with PPO presented in the paper **"Qualia Optimization in Reinforcement Learning: Balancing Agent Experience and Performance"**. It provides implementations of the Proximal Policy Optimization (PPO) algorithm for qualia optimization in three reinforcement learning (RL) tasks: **CartPole**, **HalfCheetah**, and **Pong**.
 
 This README includes detailed instructions for:
 - Setting up the necessary environments.
@@ -51,6 +51,7 @@ To avoid conflicts between dependencies for the experiments in each task, we rec
 Additionally, at least one of these environments should include the following packages for generating results:
 - `texlive`
 - `matplotlib`
+- `scipy`
 
 
 ## Extracting Existing Results

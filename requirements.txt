@@ -17,3 +17,4 @@ python==3.12
 # Additional dependencies for plotting
 matplotlib
 texlive
+scipy
