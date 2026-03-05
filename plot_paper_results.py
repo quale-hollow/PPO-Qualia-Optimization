@@ -23,6 +23,7 @@ if arg == 'halfcheetah' or arg == 'all':
                 ["0.8", "0.4", "0.2", "0.1", "0.0"],
                 ["0.01", "0.1", "0.3", "0.5", "1.0"]
             ]
+            per_update_qualia_limits = [-0.05, 0.3]
 
         if norm == "norm":
             omegas = [
@@ -30,15 +31,17 @@ if arg == 'halfcheetah' or arg == 'all':
                 ["0.95", "0.9", "0.5", "0.1", "0.0"],
                 ["0.1", "0.5", "1.0", "2.0", "4.0"]
             ]
+            per_update_qualia_limits = [-0.05, 0.3]
 
         
         line_colors = ['C1', 'C2', 'C3', 'C4', 'C5']
         names = ["PPO - Advantage Inflation", "PPO - Asymmetric Clipping", "PPO - Additive Regularizer"]
         methods = ['method1', 'method2', 'method3']
 
-        per_update_qualia_limits = [0.95 - 1, 1.25 - 1]
+        
 
-        plot_curves(methods, names, omegas, norm, line_colors, f'experiment_results/halfcheetah_{norm}', 'halfcheetah', save_dir="plots/", qe_lims=per_update_qualia_limits, NUM_TRIALS=100, NUM_BINS=100)
+        plot_curves(methods, names, omegas, norm, line_colors, f'experiment_results/halfcheetah_{norm}', 'halfcheetah', \
+                    save_dir="ppo_plots/", qe_lims=per_update_qualia_limits, NUM_TRIALS=100, NUM_BINS=100)
 
 
 # CartPole
@@ -58,7 +61,7 @@ if arg == 'cartpole' or arg == 'all':
 
     qe_lims = [0.9995 - 1, .0020]
 
-    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/cartpole_norm', 'cartpole', save_dir="plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100)
+    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/cartpole_norm', 'cartpole', save_dir="ppo_plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100)
 
 
 # Pong
@@ -79,5 +82,5 @@ if arg == 'pong' or arg == 'all':
     qe_lims = [-0.001, 0.04]
 
 
-    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/pong_norm', 'pong', save_dir="plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100)
+    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/pong_norm', 'pong', save_dir="ppo_plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100)
 

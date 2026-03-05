@@ -260,7 +260,7 @@ def plot_curves(
         ax[0].yaxis.set_major_formatter(plt.FuncFormatter(axes_labels))
 
         ax[1].set_xlabel("Time Step", labelpad=label_pad)
-        ax[1].set_ylabel(r"Per-Update $Q_i$", labelpad=label_pad)
+        ax[1].set_ylabel(r"Per-Update $Q_k$", labelpad=label_pad)
         ax[1].xaxis.set_major_formatter(plt.FuncFormatter(axes_labels))
         if qe_lims is not None:
             ax[1].set_ylim(*qe_lims)
