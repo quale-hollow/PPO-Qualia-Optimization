@@ -18,4 +18,4 @@ names = ["Method 1 - Advantage Inflation", "Method 2 - Asymmetric Clipping", "Me
 methods = ['method1', 'method2', 'method3']
 
 
-plot_curves(methods, names, omegas, norm, line_colors, 'test_dir', 'cartpole', save_dir="test_dir", qe_lims=None, NUM_TRIALS=300, NUM_BINS=100)
+plot_curves(methods, names, omegas, norm, line_colors, 'test_dir', 'cartpole', save_dir="test_dir", qe_lims=None, NUM_TRIALS=100, NUM_BINS=100)

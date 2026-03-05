@@ -66,6 +66,31 @@ This populates `experiment_results/` with:
 - `cartpole_norm`
 - `pong_norm`
 
+Each environment folder uses this structure:
+
+```text
+experiment_results/<env>_<norm_mode>/
+  <method>/                      # control, method1 (advantage inflation), method2 (asymmetric clipping), method3 (additive regularization)
+    omega_<omega>/
+      timestep_returns/
+      ep_returns/
+      mean_ratios/
+      cumulative_ratios/
+```
+
+Each csv corresponds to a single trial.
+
+CSV contents:
+- `timestep_returns/*.csv`: 2 columns, `[global_step, episodic_return]`
+- `ep_returns/*.csv`: 1 column, episodic return sequence for that trial
+- `mean_ratios/*.csv`: 2 columns, `[global_step, average per-update likelihood ratio: mean(exp(new_logprob - old_logprob))]`
+- `cumulative_ratios/*.csv`: 2 columns, `[global_step, running sum of exp(new_logprob - old_logprob)]` (unused)
+
+Notes:
+- `new_logprob` is evaluated after PPO policy updates for the current rollout batch; `old_logprob` is the stored rollout policy log-probability from data collection time.
+- The plot labeled per-update qualia valence (`Q_k`) is computed from `mean_ratios` as:
+  - `Q_k = mean_ratio_k - 1`
+
 ## Run Single Experiments
 
 ```bash
@@ -112,6 +137,17 @@ python plot_paper_results.py [halfcheetah|cartpole|pong|all]
 If no argument is provided, default is `all`.
 
 Generated PDFs are saved to `ppo_plots/`.
+
+Plotting/statistical details (`utils/plotting_utils.py`):
+- 95% confidence intervals use Student's t distribution:
+  - `CI_95 half-width = t.ppf(0.975, df=n-1) * (sample_std(ddof=1) / sqrt(n))`
+- Time-step curves are built by:
+  - concatenating all trial rows for a metric,
+  - sorting by global step,
+  - binning into `NUM_BINS` contiguous bins using `bin_size = len(all_rows) // NUM_BINS` (minimum 1),
+  - using the mean global step in each bin as the x-value,
+  - plotting the bin mean with t-based 95% CI.
+- For `mean_ratios`, plotting converts to per-update qualia valence by subtracting `1.0` before computing bin means/CIs.
 
 Minimal plotting example:
 
