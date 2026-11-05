@@ -61,7 +61,7 @@ if arg == 'cartpole' or arg == 'all':
 
     qe_lims = [0.9995 - 1, .0020]
 
-    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/cartpole_norm', 'cartpole', 500_000, save_dir="ppo_plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100)
+    plot_curves(methods, names, omegas, norm, line_colors, 'experiment_results/cartpole_norm', 'cartpole', 500_000, save_dir="ppo_plots/", qe_lims=qe_lims, NUM_TRIALS=100, NUM_BINS=100, rqo_decimals=3)
 
 
 # Pong

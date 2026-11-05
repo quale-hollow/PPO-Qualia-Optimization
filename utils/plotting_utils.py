@@ -172,6 +172,7 @@ def plot_curves(
     qe_lims=None,
     NUM_TRIALS=None,
     NUM_BINS=100,
+    rqo_decimals=2,
 ):
     width = 397.48499
     inches_per_pt = 1 / 72.27
@@ -232,7 +233,7 @@ def plot_curves(
     table1 = (
         f"Standard PPO & N/A & "
         f"{bl_final_return:.2f}$\\pm${bl_final_return_ci:.2f} & "
-        f"{bl_qr:.2f}$\\pm${bl_qr_ci:.2f} {chr(92)}{chr(92)} {chr(92)}midrule\n"
+        f"{bl_qr:.{rqo_decimals}f}$\\pm${bl_qr_ci:.{rqo_decimals}f} {chr(92)}{chr(92)} {chr(92)}midrule\n"
     )
 
     # ---------- METHODS ----------
@@ -304,7 +305,7 @@ def plot_curves(
             table1 += (f"{names[i]} & ") if j == 0 else (f"\t & ")
             table1 += (
                 f"{omega} & {ret:.2f}$\\pm${ret_ci:.2f} & "
-                f"{QR:.2f}$\\pm${QR_ci:.2f} {chr(92)}{chr(92)}"
+                f"{QR:.{rqo_decimals}f}$\\pm${QR_ci:.{rqo_decimals}f} {chr(92)}{chr(92)}"
             )
             if j == len(omegas[i]) - 1:
                 table1 += f"{chr(92)}midrule"
