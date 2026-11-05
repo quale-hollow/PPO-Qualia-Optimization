@@ -81,7 +81,7 @@ def run_experiment(environment, results_dir, method, omega, num_trials, norm_mod
         time = datetime.now().strftime("%H%M%S")
         np.savetxt(f"{results_dir}/{method}/omega_{omega}/timestep_returns/{i}_{time}.csv", np.array(ret_by_ts), delimiter=",")
         np.savetxt(f"{results_dir}/{method}/omega_{omega}/cumulative_ratios/{i}_{time}.csv", np.array(sum_ratios), delimiter=",")
-        np.savetxt(f"{results_dir}/{method}/omega_{omega}/ep_lengths/{i}_{time}.csv", np.array(ret_by_ep), delimiter=",")
+        np.savetxt(f"{results_dir}/{method}/omega_{omega}/ep_returns/{i}_{time}.csv", np.array(ret_by_ep), delimiter=",")
         np.savetxt(f"{results_dir}/{method}/omega_{omega}/mean_ratios/{i}_{time}.csv", np.array(mean_ratios), delimiter=",")
 
     print("End Time: ", datetime.now().strftime("%H:%M"), flush=True)

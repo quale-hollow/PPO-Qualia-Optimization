@@ -17,104 +17,93 @@ def ci95_halfwidth(vals):
     return t.ppf(0.975, df=n - 1) * sem
 
 
-def get_returns_data(filepath, num_bins=100, max_trials=None):
+def bin_trials(trials, total_steps, num_bins=100, value_offset=0.0):
     """
-    Returns:
-        grouped_timesteps, mean_returns_bins, ci95_returns_bins, count
-    """
-    returns_combined = np.empty((0, 2))
-    count = 0
+    Trial-level learning curve over equal-width time step bins.
 
-    files = os.listdir(filepath)
+    Each trial contributes one value per bin (the mean of its rows in that bin),
+    and the bin's mean and 95% CI are computed across those per-trial values.
+
+    Args:
+        trials: list of [T, 2] arrays with columns [global_step, value], one per trial.
+        value_offset: subtracted from each value (1.0 converts ratios to Q_k).
+
+    Returns:
+        bin_centers, mean_bins, ci95_bins
+    """
+    bin_width = total_steps / num_bins
+    per_trial = np.full((len(trials), num_bins), np.nan)
+
+    for i, rows in enumerate(trials):
+        rows = np.asarray(rows, dtype=np.float64)
+        rows = rows[np.isfinite(rows).all(axis=1)]
+        idx = np.clip((rows[:, 0] / bin_width).astype(int), 0, num_bins - 1)
+        counts = np.bincount(idx, minlength=num_bins)
+        sums = np.bincount(idx, weights=rows[:, 1] - value_offset, minlength=num_bins)
+        nonempty = counts > 0
+        per_trial[i, nonempty] = sums[nonempty] / counts[nonempty]
+
+    trials_per_bin = np.isfinite(per_trial).sum(axis=0)
+    if trials_per_bin.min() < len(trials):
+        print(f"Note: fewest trials in a bin is {trials_per_bin.min()} of {len(trials)} "
+              f"({np.sum(trials_per_bin < len(trials))} bins below the full count)")
+
+    bin_centers = (np.arange(num_bins) + 0.5) * bin_width
+    mean_bins = np.full(num_bins, np.nan)
+    ci95_bins = np.full(num_bins, np.nan)
+    for b in range(num_bins):
+        if trials_per_bin[b] > 0:
+            mean_bins[b] = np.nanmean(per_trial[:, b])
+            ci95_bins[b] = ci95_halfwidth(per_trial[:, b])
+
+    return bin_centers, mean_bins, ci95_bins
+
+
+def get_trial_files(condition_dir, max_trials=None):
+    """
+    File names present in all three metric folders, sorted so every metric uses
+    the same trials regardless of filesystem listing order.
+    """
+    metric_dirs = ["timestep_returns", "ep_returns", "mean_ratios"]
+    shared = set.intersection(*(set(os.listdir(f"{condition_dir}/{m}")) for m in metric_dirs))
+    files = sorted(shared)
     if max_trials is not None:
         files = files[:max_trials]
-
-    for fname in files:
-        data = np.genfromtxt(os.path.join(filepath, fname), delimiter=",")
-        returns_combined = np.vstack((returns_combined, data))
-        count += 1
-
-    returns_combined = returns_combined[returns_combined[:, 0].argsort()]
-
-    bin_size = max(1, len(returns_combined) // num_bins)
-
-    mean_returns_bins = np.zeros(num_bins)
-    ci95_returns_bins = np.zeros(num_bins)
-    grouped_timesteps = np.zeros(num_bins)
-
-    for i in range(num_bins):
-        start = i * bin_size
-        if start >= len(returns_combined):
-            grouped_timesteps[i] = grouped_timesteps[i - 1] if i > 0 else 0.0
-            mean_returns_bins[i] = mean_returns_bins[i - 1] if i > 0 else 0.0
-            ci95_returns_bins[i] = 0.0
-            continue
-
-        end = len(returns_combined) if i == num_bins - 1 else min(len(returns_combined), (i + 1) * bin_size)
-
-        grouped_timesteps[i] = np.mean(returns_combined[start:end, 0])
-        group_values = returns_combined[start:end, 1]
-
-        mean_returns_bins[i] = np.mean(group_values)
-        ci95_returns_bins[i] = ci95_halfwidth(group_values)
-
-    return grouped_timesteps, mean_returns_bins, ci95_returns_bins, count
+    return files
 
 
-def get_binned_reinforcement_data(filepath, num_bins=100, max_trials=None):
+def get_returns_data(filepath, files, total_steps, num_bins=100):
     """
     Returns:
-        grouped_timesteps, mean_bins, ci95_bins, count
+        bin_centers, mean_returns_bins, ci95_returns_bins, count
     """
-    reinforcement_combined = np.empty((0, 2))
-    count = 0
-
-    files = os.listdir(filepath)
-    if max_trials is not None:
-        files = files[:max_trials]
-
-    for fname in files:
-        data = np.genfromtxt(os.path.join(filepath, fname), delimiter=",")
-        reinforcement_combined = np.vstack((reinforcement_combined, data))
-        count += 1
-
-    reinforcement_combined = reinforcement_combined[reinforcement_combined[:, 0].argsort()]
-
-    bin_size = max(1, len(reinforcement_combined) // num_bins)
-
-    mean_bins = np.zeros(num_bins)
-    ci95_bins = np.zeros(num_bins)
-    grouped_timesteps = np.zeros(num_bins)
-
-    for i in range(num_bins):
-        start = i * bin_size
-        if start >= len(reinforcement_combined):
-            grouped_timesteps[i] = grouped_timesteps[i - 1] if i > 0 else 0.0
-            mean_bins[i] = mean_bins[i - 1] if i > 0 else 0.0
-            ci95_bins[i] = 0.0
-            continue
-
-        end = len(reinforcement_combined) if i == num_bins - 1 else min(len(reinforcement_combined), (i + 1) * bin_size)
-
-        grouped_timesteps[i] = np.mean(reinforcement_combined[start:end, 0])
-        group_values = reinforcement_combined[start:end, 1] - 1.0
-
-        mean_bins[i] = np.mean(group_values)
-        ci95_bins[i] = ci95_halfwidth(group_values)
-
-    return grouped_timesteps, mean_bins, ci95_bins, count
+    trials = [
+        np.genfromtxt(os.path.join(filepath, fname), delimiter=",").reshape(-1, 2)
+        for fname in files
+    ]
+    bin_centers, mean_bins, ci95_bins = bin_trials(trials, total_steps, num_bins=num_bins)
+    return bin_centers, mean_bins, ci95_bins, len(trials)
 
 
-def get_final_return(filepath, max_trials=None):
+def get_binned_reinforcement_data(filepath, files, total_steps, num_bins=100):
+    """
+    Returns:
+        bin_centers, mean_bins, ci95_bins, count
+    """
+    trials = [
+        np.genfromtxt(os.path.join(filepath, fname), delimiter=",").reshape(-1, 2)
+        for fname in files
+    ]
+    bin_centers, mean_bins, ci95_bins = bin_trials(trials, total_steps, num_bins=num_bins, value_offset=1.0)
+    return bin_centers, mean_bins, ci95_bins, len(trials)
+
+
+def get_final_return(filepath, files):
     """
     Returns:
         mean_final_return, ci95_final_return
     """
     final_returns = []
-
-    files = os.listdir(filepath)
-    if max_trials is not None:
-        files = files[:max_trials]
 
     for fname in files:
         data = np.genfromtxt(os.path.join(filepath, fname), delimiter=",")
@@ -127,16 +116,12 @@ def get_final_return(filepath, max_trials=None):
     return mean_final_return, ci95_final_return
 
 
-def get_final_qualia_return(filepath, max_trials=None):
+def get_final_qualia_return(filepath, files):
     """
     Returns:
         mean_qualia_return, ci95_qualia_return
     """
     qualia_returns = []
-
-    files = os.listdir(filepath)
-    if max_trials is not None:
-        files = files[:max_trials]
 
     for fname in files:
         data = np.genfromtxt(os.path.join(filepath, fname), delimiter=",")
@@ -182,6 +167,7 @@ def plot_curves(
     line_colors,
     path,
     env,
+    total_steps,
     save_dir="plots",
     qe_lims=None,
     NUM_TRIALS=None,
@@ -217,26 +203,30 @@ def plot_curves(
         os.makedirs(save_dir, exist_ok=True)
 
     # ---------- BASELINE (CONTROL) ----------
+    bl_files = get_trial_files(f"{path}/control/omega_0.0", max_trials=NUM_TRIALS)
+
     bl_ret_x, bl_ret_y, bl_ret_ci, bl_ret_count = get_returns_data(
         f"{path}/control/omega_0.0/timestep_returns/",
+        bl_files,
+        total_steps,
         num_bins=NUM_BINS,
-        max_trials=NUM_TRIALS,
     )
     print("Count for baseline: ", bl_ret_count)
 
     bl_rf_x, bl_rf_y, bl_rf_ci, _ = get_binned_reinforcement_data(
         f"{path}/control/omega_0.0/mean_ratios/",
+        bl_files,
+        total_steps,
         num_bins=NUM_BINS,
-        max_trials=NUM_TRIALS,
     )
 
     bl_final_return, bl_final_return_ci = get_final_return(
         f"{path}/control/omega_0.0/ep_returns/",
-        max_trials=NUM_TRIALS,
+        bl_files,
     )
     bl_qr, bl_qr_ci = get_final_qualia_return(
         f"{path}/control/omega_0.0/mean_ratios/",
-        max_trials=NUM_TRIALS,
+        bl_files,
     )
 
     table1 = (
@@ -270,7 +260,7 @@ def plot_curves(
         ax[2].yaxis.set_major_formatter(plt.FuncFormatter(axes_labels))
 
         ax[3].set_xlabel(r"$\omega$", labelpad=label_pad)
-        ax[3].set_ylabel("Final RQO", labelpad=label_pad)
+        ax[3].set_ylabel("RQO", labelpad=label_pad)
         ax[3].yaxis.set_major_formatter(plt.FuncFormatter(axes_labels))
 
         # ---- plot baseline (control) with 95% CI ----
@@ -285,10 +275,13 @@ def plot_curves(
 
         # ---- plot each omega curve ----
         for j, omega in enumerate(omegas[i]):
+            files = get_trial_files(f"{path}/{method}/omega_{omega}", max_trials=NUM_TRIALS)
+
             x, y, ci, count = get_returns_data(
                 f"{path}/{method}/omega_{omega}/timestep_returns/",
+                files,
+                total_steps,
                 num_bins=NUM_BINS,
-                max_trials=NUM_TRIALS,
             )
             print("Count for ", method, omega, norm, ": ", count)
 
@@ -297,15 +290,16 @@ def plot_curves(
 
             x, y, ci, _ = get_binned_reinforcement_data(
                 f"{path}/{method}/omega_{omega}/mean_ratios/",
+                files,
+                total_steps,
                 num_bins=NUM_BINS,
-                max_trials=NUM_TRIALS,
             )
             ax[1].plot(x, y, color=line_colors[j])
             ax[1].fill_between(x, y - ci, y + ci, alpha=0.3, color=line_colors[j])
 
             # Final metrics + table
-            ret, ret_ci = get_final_return(f"{path}/{method}/omega_{omega}/ep_returns/", max_trials=NUM_TRIALS)
-            QR, QR_ci = get_final_qualia_return(f"{path}/{method}/omega_{omega}/mean_ratios/", max_trials=NUM_TRIALS)
+            ret, ret_ci = get_final_return(f"{path}/{method}/omega_{omega}/ep_returns/", files)
+            QR, QR_ci = get_final_qualia_return(f"{path}/{method}/omega_{omega}/mean_ratios/", files)
 
             table1 += (f"{names[i]} & ") if j == 0 else (f"\t & ")
             table1 += (

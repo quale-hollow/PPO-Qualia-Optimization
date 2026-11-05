@@ -141,12 +141,12 @@ Generated PDFs are saved to `ppo_plots/`.
 Plotting/statistical details (`utils/plotting_utils.py`):
 - 95% confidence intervals use Student's t distribution:
   - `CI_95 half-width = t.ppf(0.975, df=n-1) * (sample_std(ddof=1) / sqrt(n))`
+- Each condition uses the first `NUM_TRIALS` file names (sorted) present in all three metric folders, so curves and final values come from the same trials.
 - Time-step curves are built by:
-  - concatenating all trial rows for a metric,
-  - sorting by global step,
-  - binning into `NUM_BINS` contiguous bins using `bin_size = len(all_rows) // NUM_BINS` (minimum 1),
-  - using the mean global step in each bin as the x-value,
-  - plotting the bin mean with t-based 95% CI.
+  - dividing training into `NUM_BINS` equal-width bins over `total_steps`,
+  - averaging each trial's rows within each bin to get one value per trial,
+  - using the bin center as the x-value,
+  - plotting the mean across trials with t-based 95% CI (`n` = trials with data in that bin).
 - For `mean_ratios`, plotting converts to per-update qualia valence by subtracting `1.0` before computing bin means/CIs.
 
 Minimal plotting example:
