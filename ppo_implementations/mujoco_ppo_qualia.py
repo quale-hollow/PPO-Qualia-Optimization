@@ -152,13 +152,8 @@ def cuda():
 
 def learn(args: Args, run_name=None):
     ret_by_timestep = []
-    ratio_sums = []
     ratio_means = []
 
-    cumulative_sum = 0
-
-    # log episodic return by number of episodes, starting at end of episode 1
-    ret_by_episode = []
 
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
@@ -237,7 +232,6 @@ def learn(args: Args, run_name=None):
                         # writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         # writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
                         ret_by_timestep.append([global_step, info["episode"]["r"].item()])
-                        ret_by_episode.append(info["episode"]["r"].item())
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -351,9 +345,6 @@ def learn(args: Args, run_name=None):
         batch_log_ratio = batch_new_logprobs - b_logprobs
         batch_ratio = batch_log_ratio.exp()
 
-        cumulative_sum += batch_ratio.sum().item()
-
-        ratio_sums.append([global_step, cumulative_sum])
         ratio_means.append([global_step, batch_ratio.mean().item()])
 
         # # TRY NOT TO MODIFY: record rewards for plotting purposes
@@ -372,5 +363,5 @@ def learn(args: Args, run_name=None):
     envs.close()
     #writer.close()
 
-    return ret_by_episode, ret_by_timestep, ratio_sums, ratio_means
+    return ret_by_timestep, ratio_means
 

@@ -4,7 +4,7 @@ import os
 import sys
 from datetime import datetime
 
-# usage: python run_ppo_qualia.py python run_experiment.py [environment] [results_directory] [method] [omega] [num_trials] [norm_mode]
+# usage: python run_experiment.py [environment] [results_directory] [method] [omega] [num_trials] [norm_mode]
 def run_experiment(environment, results_dir, method, omega, num_trials, norm_mode):
     
     methods = ["method1", "method2", "method3", "control"]
@@ -56,14 +56,9 @@ def run_experiment(environment, results_dir, method, omega, num_trials, norm_mod
     if not os.path.exists(f"{results_dir}/{method}/omega_{omega}/timestep_returns"):
         os.mkdir(f"{results_dir}/{method}/omega_{omega}/timestep_returns")
 
-    if not os.path.exists(f"{results_dir}/{method}/omega_{omega}/ep_returns"):
-        os.mkdir(f"{results_dir}/{method}/omega_{omega}/ep_returns")
-
     if not os.path.exists(f"{results_dir}/{method}/omega_{omega}/mean_ratios"):
         os.mkdir(f"{results_dir}/{method}/omega_{omega}/mean_ratios")
 
-    if not os.path.exists(f"{results_dir}/{method}/omega_{omega}/cumulative_ratios"):
-        os.mkdir(f"{results_dir}/{method}/omega_{omega}/cumulative_ratios")
 
 
     print("Running PPO trials on device: ", ppo.cuda(), flush=True)
@@ -77,11 +72,9 @@ def run_experiment(environment, results_dir, method, omega, num_trials, norm_mod
         print(f"Beginning Trial {i+1} of {NUM_TRIALS}", flush=True)
         args.seed = seed
 
-        ret_by_ep, ret_by_ts, sum_ratios, mean_ratios = ppo.learn(args)
+        ret_by_ts, mean_ratios = ppo.learn(args)
         time = datetime.now().strftime("%H%M%S")
         np.savetxt(f"{results_dir}/{method}/omega_{omega}/timestep_returns/{i}_{time}.csv", np.array(ret_by_ts), delimiter=",")
-        np.savetxt(f"{results_dir}/{method}/omega_{omega}/cumulative_ratios/{i}_{time}.csv", np.array(sum_ratios), delimiter=",")
-        np.savetxt(f"{results_dir}/{method}/omega_{omega}/ep_returns/{i}_{time}.csv", np.array(ret_by_ep), delimiter=",")
         np.savetxt(f"{results_dir}/{method}/omega_{omega}/mean_ratios/{i}_{time}.csv", np.array(mean_ratios), delimiter=",")
 
     print("End Time: ", datetime.now().strftime("%H:%M"), flush=True)

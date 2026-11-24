@@ -121,13 +121,8 @@ class Agent(nn.Module):
 def learn(args: Args, run_name=None):
 
     ret_by_timestep = []
-    ratio_sums = []
     ratio_means = []
 
-    cumulative_sum = 0
-
-    # log episodic return by number of episodes, starting at end of episode 1
-    ret_by_episode = []
 
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
@@ -212,7 +207,6 @@ def learn(args: Args, run_name=None):
                 if d and info["lives"][idx] == 0:
                     # print(f"global_step = {global_step}, episodic_return = {episode_returns[idx]}")
                     
-                    ret_by_episode.append(episode_returns[idx])
                     ret_by_timestep.append([global_step, episode_returns[idx]])
 
                     episode_returns[idx] = 0
@@ -319,11 +313,8 @@ def learn(args: Args, run_name=None):
         batch_log_ratio = batch_new_logprobs - b_logprobs
         batch_ratio = batch_log_ratio.exp()
 
-        cumulative_sum += batch_ratio.sum().item()
-
-        ratio_sums.append([global_step, cumulative_sum])
         ratio_means.append([global_step, batch_ratio.mean().item()])
 
     envs.close()
 
-    return ret_by_episode, ret_by_timestep, ratio_sums, ratio_means
+    return ret_by_timestep, ratio_means

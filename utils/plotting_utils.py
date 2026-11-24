@@ -4,6 +4,16 @@ import matplotlib.pyplot as plt
 from scipy.stats import t
 
 
+# Fixed panel geometry shared by every per-method figure (instead of constrained_layout and
+# tight bounding boxes), so all figures have the same size and panel positions and line up
+# when stacked in the paper. Margins are fractions of the figure; YLABEL_X places every
+# y-axis label at the same offset from its axis (in axes coordinates).
+FIG_HEIGHT_RATIO = 0.28
+PANEL_MARGINS = dict(left=0.095, right=0.99, bottom=0.33, top=0.88, wspace=0.75)
+YLABEL_X = -0.46
+LEGEND_PAD = 0.03
+
+
 # ----------------------------
 # 95% CI (t-based) half-width
 # ----------------------------
@@ -15,6 +25,11 @@ def ci95_halfwidth(vals):
         return 0.0
     sem = np.std(vals, ddof=1) / np.sqrt(n)
     return t.ppf(0.975, df=n - 1) * sem
+
+
+def pm(mean, ci, decimals=2):
+    """Table entry 'mean ± ci' fully in math mode, so negatives get a true minus sign."""
+    return f"${mean:.{decimals}f} \\pm {ci:.{decimals}f}$"
 
 
 def bin_trials(trials, total_steps, num_bins=100, value_offset=0.0):
@@ -44,9 +59,6 @@ def bin_trials(trials, total_steps, num_bins=100, value_offset=0.0):
         per_trial[i, nonempty] = sums[nonempty] / counts[nonempty]
 
     trials_per_bin = np.isfinite(per_trial).sum(axis=0)
-    if trials_per_bin.min() < len(trials):
-        print(f"Note: fewest trials in a bin is {trials_per_bin.min()} of {len(trials)} "
-              f"({np.sum(trials_per_bin < len(trials))} bins below the full count)")
 
     bin_centers = (np.arange(num_bins) + 0.5) * bin_width
     mean_bins = np.full(num_bins, np.nan)
@@ -61,10 +73,10 @@ def bin_trials(trials, total_steps, num_bins=100, value_offset=0.0):
 
 def get_trial_files(condition_dir, max_trials=None):
     """
-    File names present in all three metric folders, sorted so every metric uses
+    File names present in both metric folders, sorted so every metric uses
     the same trials regardless of filesystem listing order.
     """
-    metric_dirs = ["timestep_returns", "ep_returns", "mean_ratios"]
+    metric_dirs = ["timestep_returns", "mean_ratios"]
     shared = set.intersection(*(set(os.listdir(f"{condition_dir}/{m}")) for m in metric_dirs))
     files = sorted(shared)
     if max_trials is not None:
@@ -98,16 +110,22 @@ def get_binned_reinforcement_data(filepath, files, total_steps, num_bins=100):
     return bin_centers, mean_bins, ci95_bins, len(trials)
 
 
+def get_episode_returns(filepath, fname):
+    """
+    A trial's sequence of episodic returns, in episode order, read from its
+    timestep_returns csv (columns: [global_step, episodic_return]).
+    """
+    return np.genfromtxt(os.path.join(filepath, fname), delimiter=",").reshape(-1, 2)[:, 1]
+
+
 def get_final_return(filepath, files):
     """
+    Final return is each trial's last episodic return (from timestep_returns).
+
     Returns:
         mean_final_return, ci95_final_return
     """
-    final_returns = []
-
-    for fname in files:
-        data = np.genfromtxt(os.path.join(filepath, fname), delimiter=",")
-        final_returns.append(data[-1])
+    final_returns = [get_episode_returns(filepath, fname)[-1] for fname in files]
 
     final_returns = np.asarray(final_returns, dtype=np.float64)
     mean_final_return = float(np.mean(final_returns))
@@ -146,17 +164,11 @@ def set_size(width, fraction=1, subplots=(1, 1)):
 
 
 def axes_labels(x, pos):
-    if x >= 1e6:
-        return f"{x*1e-6:.0f}M"
-    elif x >= 1e3:
-        if x % 1000 == 0:
-            return f"{x*1e-3:.0f}K"
-        else:
-            return f"{x*1e-3:.1f}K"
-    elif x < 1:
-        return f"{x:.2f}"
-    else:
-        return f"{x:.0f}"
+    """Compact tick labels, e.g. -500, 0.25, 1.5K, 40M."""
+    for scale, suffix in ((1e6, "M"), (1e3, "K")):
+        if abs(x) >= scale:
+            return f"{x / scale:g}{suffix}"
+    return f"{x:g}"
 
 
 def plot_curves(
@@ -178,7 +190,7 @@ def plot_curves(
     inches_per_pt = 1 / 72.27
 
     fig_width = width * inches_per_pt
-    fig_height = fig_width * (1 / 4)
+    fig_height = fig_width * FIG_HEIGHT_RATIO
     layout = (1, 4)
     fig_dim = (fig_width, fig_height)
 
@@ -222,7 +234,7 @@ def plot_curves(
     )
 
     bl_final_return, bl_final_return_ci = get_final_return(
-        f"{path}/control/omega_0.0/ep_returns/",
+        f"{path}/control/omega_0.0/timestep_returns/",
         bl_files,
     )
     bl_qr, bl_qr_ci = get_final_qualia_return(
@@ -232,8 +244,8 @@ def plot_curves(
 
     table1 = (
         f"Standard PPO & N/A & "
-        f"{bl_final_return:.2f}$\\pm${bl_final_return_ci:.2f} & "
-        f"{bl_qr:.{rqo_decimals}f}$\\pm${bl_qr_ci:.{rqo_decimals}f} {chr(92)}{chr(92)} {chr(92)}midrule\n"
+        f"{pm(bl_final_return, bl_final_return_ci)} & "
+        f"{pm(bl_qr, bl_qr_ci, rqo_decimals)} \\\\ \\midrule\n"
     )
 
     # ---------- METHODS ----------
@@ -241,8 +253,9 @@ def plot_curves(
         baseline_omega = "1.0" if method == "method2" else "0.0"
         control_x = 1 if method == "method2" else 0
 
-        fig, ax = plt.subplots(layout[0], layout[1], figsize=fig_dim, constrained_layout=True)
-        fig.suptitle(names[i], fontsize=9)
+        fig, ax = plt.subplots(layout[0], layout[1], figsize=fig_dim)
+        fig.subplots_adjust(**PANEL_MARGINS)
+        fig.suptitle(names[i], fontsize=9, y=0.995)
         label_pad = 0
 
         ax[0].set_xlabel("Time Step", labelpad=label_pad)
@@ -299,13 +312,13 @@ def plot_curves(
             ax[1].fill_between(x, y - ci, y + ci, alpha=0.3, color=line_colors[j])
 
             # Final metrics + table
-            ret, ret_ci = get_final_return(f"{path}/{method}/omega_{omega}/ep_returns/", files)
+            ret, ret_ci = get_final_return(f"{path}/{method}/omega_{omega}/timestep_returns/", files)
             QR, QR_ci = get_final_qualia_return(f"{path}/{method}/omega_{omega}/mean_ratios/", files)
 
             table1 += (f"{names[i]} & ") if j == 0 else (f"\t & ")
             table1 += (
-                f"{omega} & {ret:.2f}$\\pm${ret_ci:.2f} & "
-                f"{QR:.{rqo_decimals}f}$\\pm${QR_ci:.{rqo_decimals}f} {chr(92)}{chr(92)}"
+                f"{omega} & {pm(ret, ret_ci)} & "
+                f"{pm(QR, QR_ci, rqo_decimals)} \\\\"
             )
             if j == len(omegas[i]) - 1:
                 table1 += f"{chr(92)}midrule"
@@ -320,6 +333,10 @@ def plot_curves(
             labels,
             loc="lower center",
             mode="expand",
+            # span the panel row, so the legend lines up with the panels; LEGEND_PAD
+            # leaves a gap below it so stacked figures don't touch
+            bbox_to_anchor=(PANEL_MARGINS["left"], LEGEND_PAD,
+                            PANEL_MARGINS["right"] - PANEL_MARGINS["left"], 1),
             ncol=6,
             columnspacing=1,
             handletextpad=0.2,
@@ -327,10 +344,67 @@ def plot_curves(
             borderaxespad=0,
             frameon=False,
         )
-        fig.get_layout_engine().set(h_pad=0.01)
+        for a in ax:
+            a.yaxis.set_label_coords(YLABEL_X, 0.5)
 
-        plt.savefig(f"{save_dir}/{env}_{method}_{norm}.pdf", format="pdf", bbox_inches="tight")
+        plt.savefig(f"{save_dir}/{env}_{method}_{norm}.pdf", format="pdf")
         plt.clf()
 
     print("\n\n")
     print(table1)
+
+
+def get_condition_finals(condition_dir, NUM_TRIALS=None, last_n_episodes=1):
+    """
+    Final return is each trial's mean over its last `last_n_episodes` training
+    episodes, then the mean and 95% CI across trials.
+
+    Returns:
+        mean_final_return, ci95_final_return, mean_rqo, ci95_rqo
+    """
+    files = get_trial_files(condition_dir, max_trials=NUM_TRIALS)
+    final_returns = np.asarray([
+        np.mean(get_episode_returns(f"{condition_dir}/timestep_returns/", fname)[-last_n_episodes:])
+        for fname in files
+    ])
+    QR, QR_ci = get_final_qualia_return(f"{condition_dir}/mean_ratios/", files)
+    return float(np.mean(final_returns)), float(ci95_halfwidth(final_returns)), QR, QR_ci
+
+
+def plot_tradeoff(ax, path, methods, names, omegas, title, yscale="linear", NUM_TRIALS=None,
+                  last_n_episodes=1):
+    """
+    Final return vs RQO for each method, removing omega from the comparison.
+    Each method's line starts at standard PPO and follows its omegas in the order
+    given (increasing reinforcement bias). Curves that climb higher while staying
+    near standard PPO's return (dashed line) give the better trade-off.
+    """
+    method_styles = [("C1", "s"), ("C2", "^"), ("C3", "D")]
+
+    bl = get_condition_finals(f"{path}/control/omega_0.0", NUM_TRIALS, last_n_episodes)
+
+    for i, method in enumerate(methods):
+        color, marker = method_styles[i]
+        points = [bl] + [
+            get_condition_finals(f"{path}/{method}/omega_{omega}", NUM_TRIALS, last_n_episodes)
+            for omega in omegas[i]
+        ]
+        ret, ret_ci, QR, QR_ci = map(np.array, zip(*points))
+        # The baseline point's error bars are drawn once, in blue, below
+        ret_ci[0], QR_ci[0] = 0.0, 0.0
+        ax.errorbar(ret, QR, xerr=ret_ci, yerr=QR_ci, fmt=f"-{marker}", color=color,
+                    linewidth=0.8, markersize=3, elinewidth=0.6, capsize=1, label=names[i])
+
+    ax.errorbar(bl[0], bl[2], xerr=bl[1], yerr=bl[3], fmt="o", color="C0",
+                markersize=4, elinewidth=0.6, capsize=1, label="Standard PPO", zorder=3)
+
+    if yscale == "symlog":
+        ax.set_yscale("symlog", linthresh=1)
+    else:
+        ax.set_yscale(yscale)
+    # Standard PPO's return: curves that rise while staying near this line lose the least performance
+    ax.axvline(bl[0], color="C0", linestyle="--", linewidth=0.6, alpha=0.6, zorder=0)
+
+    ax.set_title(title, fontsize=8)
+    ax.set_xlabel(r"Final $J(\theta)$", labelpad=0)
+    ax.set_ylabel("RQO", labelpad=2)

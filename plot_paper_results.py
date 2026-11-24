@@ -31,7 +31,7 @@ if arg == 'halfcheetah' or arg == 'all':
                 ["0.95", "0.9", "0.5", "0.1", "0.0"],
                 ["0.1", "0.5", "1.0", "2.0", "4.0"]
             ]
-            per_update_qualia_limits = [-0.05, 0.3]
+            per_update_qualia_limits = [-0.05, 0.5]
 
         
         line_colors = ['C1', 'C2', 'C3', 'C4', 'C5']
